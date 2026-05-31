@@ -20,7 +20,7 @@ jobs:
           sudo swapoff -a || true
           sudo rm -f /swapfile
 
-          sudo fallocate -l 16G /swapfile
+          sudo fallocate -l 20G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
@@ -86,8 +86,8 @@ jobs:
           export NVCC_APPEND_FLAGS="-ccbin=gcc-14"
           
           # 3. Apply memory and architecture limits for the L4 GPU
-          export MAX_JOBS=4
-          export NVCC_THREADS=1
+          export MAX_JOBS=2
+          export NVCC_THREADS=2
           export TORCH_CUDA_ARCH_LIST="8.9"
           
           echo "Starting compilation for CUDA 13.0 + GCC 14..."
