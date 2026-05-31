@@ -1,0 +1,89 @@
+name: Flash-Attention (CUDA 13.0 / GCC 14 / Py3.12)
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  build-wheel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: cleanup
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo apt-get clean
+
+      - name: swap
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install GCC 14 & CUDA 13.0 Toolkit
+        run: |
+          sudo apt-get update
+          # Install GCC 14
+          sudo apt-get install -y gcc-14 g++-14
+          
+          # Add NVIDIA repository and install CUDA 13.0 Toolkit
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update
+          sudo apt-get install -y cuda-toolkit-13-0
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install packaging ninja wheel
+          # Install PyTorch explicitly for CUDA 13.0
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+
+      - name: Clone Flash-Attention
+        run: |
+          git clone https://github.com/Dao-AILab/flash-attention.git
+
+      - name: patch to remove backwell since currently not required
+        # Automatically hijack the setup.py to prevent it from building for 100/110/120
+        run: |
+          cd flash-attention
+          sed -i 's/"100"/"__REMOVED_100__"/g' setup.py
+          sed -i 's/"110"/"__REMOVED_110__"/g' setup.py
+          sed -i 's/"120"/"__REMOVED_120__"/g' setup.py
+
+      - name: Compile Wheel and setup gcc 14
+        run: |
+          cd flash-attention
+          
+          # 1. Point environment to CUDA 13.0 explicitly
+          export CUDA_HOME=/usr/local/cuda-13.0
+          export PATH=/usr/local/cuda-13.0/bin:$PATH
+          
+          # 2. Force the build to use GCC 14
+          export CC=gcc-14
+          export CXX=g++-14
+          export NVCC_APPEND_FLAGS="-ccbin=gcc-14"
+          
+          # 3. Apply memory and architecture limits for the L4 GPU
+          export MAX_JOBS=2
+          export NVCC_THREADS=1
+          export TORCH_CUDA_ARCH_LIST="8.9"
+          
+          echo "Starting compilation for CUDA 13.0 + GCC 14..."
+          pip wheel . --no-build-isolation --no-cache-dir -v
+          
+          mkdir -p ../wheel_output
+          mv *.whl ../wheel_output/
+
+      - name: 📤 Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-attention-py312-l4-cu130-wheel
+          path: wheel_output/*.whl
