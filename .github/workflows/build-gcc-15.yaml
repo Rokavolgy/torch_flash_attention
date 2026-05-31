@@ -69,8 +69,8 @@ jobs:
           export CC=gcc-15
           export CXX=g++-15
           export NVCC_APPEND_FLAGS="-ccbin=gcc-15"
-          export MAX_JOBS=4
-          export NVCC_THREADS=1
+          export MAX_JOBS=1
+          export NVCC_THREADS=2
           export TORCH_CUDA_ARCH_LIST="8.9"
           
           pip wheel . --no-build-isolation --no-cache-dir -v
