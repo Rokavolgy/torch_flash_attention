@@ -66,6 +66,14 @@ jobs:
 
       - name: Compile Wheel and setup gcc 14
         run: |
+          (
+            while true; do
+              echo -e "\n[MONITOR - $(date '+%H:%M:%S')] CPU Load: $(cat /proc/loadavg | awk '{print $1,$2,$3}') | Memory Details:"
+              free -h
+              sleep 30
+            done
+          ) &
+          MONITOR_PID=$!
           cd flash-attention
           
           # 1. Point environment to CUDA 13.0 explicitly
@@ -87,6 +95,8 @@ jobs:
           
           mkdir -p ../wheel_output
           mv *.whl ../wheel_output/
+
+          kill $MONITOR_PID
 
       - name: 📤 Upload Wheel Artifact
         uses: actions/upload-artifact@v4
