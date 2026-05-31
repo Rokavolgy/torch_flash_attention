@@ -86,7 +86,7 @@ jobs:
           export NVCC_APPEND_FLAGS="-ccbin=gcc-14"
           
           # 3. Apply memory and architecture limits for the L4 GPU
-          export MAX_JOBS=2
+          export MAX_JOBS=4
           export NVCC_THREADS=1
           export TORCH_CUDA_ARCH_LIST="8.9"
           
