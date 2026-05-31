@@ -8,19 +8,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: cleanup
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo apt-get clean
+      - name: Free Disk and Memory Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
 
       - name: swap and zram
         run: |
           sudo swapoff -a || true
           sudo rm -f /swapfile
 
-          sudo fallocate -l 20G /swapfile
+          sudo fallocate -l 8G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
@@ -44,11 +47,17 @@ jobs:
           cat << 'EOF' > build_script.sh
           #!/bin/bash
           set -e
+
+         
           
           echo "Installing Ubuntu prerequisites..."
           apt-get update && apt-get install -y software-properties-common git wget
           add-apt-repository -y ppa:ubuntu-toolchain-r/test
           apt-get update
+
+          echo "applying memory fix..."
+          sudo apt-get install libjemalloc-dev
+          export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
           
           echo "Installing GCC 15 & Python 3.12..."
           apt-get install -y gcc-15 g++-15 python3.12 python3.12-dev python3.12-venv
