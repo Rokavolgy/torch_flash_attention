@@ -1,0 +1,100 @@
+name: Flash-Attention (CUDA 13.0 / GCC 14 / Py3.12)
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  build-wheel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: cleanup
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo apt-get clean
+
+      - name: swap and zram
+        run: |
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+
+          sudo fallocate -l 20G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
+          swapon --show
+          free -h
+
+      - name: Resource Monitor (Host)
+        run: |
+          (
+            while true; do
+              echo -e "\nMONITOR - $(date '+%H:%M:%S')] CPU Load: $(cat /proc/loadavg | awk '{print $1,$2,$3}') | Memory Details:"
+              free -h
+              sleep 30
+            done
+          ) &
+          echo "MONITOR_PID=$!" >> $GITHUB_ENV
+
+      - name: Create Docker Build Script
+        run: |
+          cat << 'EOF' > build_script.sh
+          #!/bin/bash
+          set -e
+          
+          echo "Installing Ubuntu prerequisites..."
+          apt-get update && apt-get install -y software-properties-common git wget
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          apt-get update
+          
+          echo "Installing GCC 15 & Python 3.12..."
+          apt-get install -y gcc-15 g++-15 python3.12 python3.12-dev python3.12-venv
+          
+          python3.12 -m venv /opt/venv
+          export PATH=/opt/venv/bin:$PATH
+          
+          pip install --upgrade pip
+          pip install packaging ninja wheel
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+          
+          git clone https://github.com/Dao-AILab/flash-attention.git
+          cd flash-attention
+          sed -i 's/"100"/"__REMOVED_100__"/g' setup.py
+          sed -i 's/"110"/"__REMOVED_110__"/g' setup.py
+          sed -i 's/"120"/"__REMOVED_120__"/g' setup.py
+          
+          export CC=gcc-15
+          export CXX=g++-15
+          export NVCC_APPEND_FLAGS="-ccbin=gcc-15"
+          export MAX_JOBS=4
+          export NVCC_THREADS=1
+          export TORCH_CUDA_ARCH_LIST="8.9"
+          
+          pip wheel . --no-build-isolation --no-cache-dir -v
+          
+          mkdir -p /workspace/wheel_output
+          mv *.whl /workspace/wheel_output/
+          EOF
+          chmod +x build_script.sh
+          
+      - name: Execute Build inside NVIDIA Docker
+        run: |
+          # Run the container, mount the GitHub workspace, and execute our script
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            nvidia/cuda:13.0.0-devel-ubuntu24.04 \
+            ./build_script.sh
+
+      - name: 🛑 Stop Resource Monitor
+        if: always() # Ensures the loop is killed even if the build crashes
+        run: kill ${{ env.MONITOR_PID }} || true
+
+      - name: 📤 Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-attention-py312-l4-cu130-gcc15-wheel
+          path: wheel_output/*.whl
