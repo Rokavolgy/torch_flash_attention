@@ -1,4 +1,4 @@
-name: Flash-Attention (CUDA 13.0 / GCC 14 / Py3.12)
+name: Flash-Attention (CUDA 13.2.1 / GCC 15 / Py3.12)
 
 on:
   workflow_dispatch: 
@@ -86,7 +86,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            nvidia/cuda:13.0.0-devel-ubuntu24.04 \
+            nvidia/cuda:13.2.1-devel-ubuntu24.04 \
             ./build_script.sh
 
       - name: 🛑 Stop Resource Monitor
