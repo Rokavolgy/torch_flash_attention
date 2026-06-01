@@ -56,7 +56,7 @@ jobs:
           apt-get update
 
           echo "applying memory fix..."
-          apt-get install libjemalloc-dev
+          apt-get install libjemalloc-dev -y
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
           
           echo "Installing GCC 15 & Python 3.12..."
